@@ -1,22 +1,13 @@
 from bottle import route, run, view, static_file, redirect, request
+from db import TodoItem
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
-class TodoItem:
-    def __init__(self, description, unique_id):
-        self.description = description
-        self.is_completed = False
-        self.uid = unique_id
+engine = create_engine("sqlite:///tasks.db")
+Session = sessionmaker(bind=engine)
+s = Session()
 
-    def __str__(self):
-        return self.description.lower()
 
-tasks_db = {
-	1: TodoItem("read a book", 1),
-	2: TodoItem("flairing", 2),
-	3: TodoItem("wash dishes", 3),
-	4: TodoItem("dinner", 4),
-	}
-
-###
 @route("/static/<filename:path>")
 def send_static(filename):
 	return static_file(filename, root="static")
@@ -25,26 +16,38 @@ def send_static(filename):
 @route("/")
 @view("index")
 def index():
-	tasks = tasks_db.values()
-	return {"tasks": tasks}
+	tasks = s.query(TodoItem).order_by(TodoItem.uid)
+	total_tasks = s.query(TodoItem).count()
+	incomplete = s.query(TodoItem).filter(TodoItem.is_completed == False).count()
+	complete = total_tasks - incomplete
+	s.commit()
+	return {"tasks": tasks,
+	"total_tasks": total_tasks,
+	"incomplete": incomplete,
+	"complete" : complete}
 
 @route("/api/delete/<uid:int>")
 def api_delete(uid):
-	tasks_db.pop(uid)
+	s.query(TodoItem).filter(TodoItem.uid == uid).delete()
+	s.commit()
 	return redirect("/")
 
 @route("/api/complete/<uid:int>")
 def api_complete(uid):
-    tasks_db[uid].is_completed = True
-    return "Ok"
+	t = s.query(TodoItem).filter(TodoItem.uid == uid).first()
+	t.is_completed = True
+	s.commit()
+	return redirect("/")
 
 @route("/add-task", method="POST")
 def add_task():
 	desc = request.POST.description.strip()
 	if len(desc) > 0:
-		new_uid = max(tasks_db.keys()) + 1
-		t = TodoItem(desc, new_uid)
-		tasks_db[new_uid] = t
+		t = TodoItem(desc)
+		s.add(t)
+		s.commit()
 	return redirect("/")
+
+
 ###
 run(host="localhost", port=8080, autoreload=True)
