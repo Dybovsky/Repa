@@ -20,7 +20,7 @@ def index():
 	total_tasks = s.query(TodoItem).count()
 	incomplete = s.query(TodoItem).filter(TodoItem.is_completed == False).count()
 	complete = total_tasks - incomplete
-	s.commit()
+	# s.commit()
 	return {"tasks": tasks,
 	"total_tasks": total_tasks,
 	"incomplete": incomplete,
@@ -35,9 +35,9 @@ def api_delete(uid):
 @route("/api/complete/<uid:int>")
 def api_complete(uid):
 	t = s.query(TodoItem).filter(TodoItem.uid == uid).first()
-	t.is_completed = True
 	s.commit()
-	return redirect("/")
+	t.is_completed = True
+	return "OK"
 
 @route("/add-task", method="POST")
 def add_task():
